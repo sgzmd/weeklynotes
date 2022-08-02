@@ -133,12 +133,13 @@ func main() {
 
 	// write the notes
 	for _, note := range notes {
-		file.WriteString(fmt.Sprintf("# %s on %s\n", note.Name, note.Date.Format("2006-01-02")))
+		file.WriteString(fmt.Sprintf("## %s on %s\n", note.Name, note.Date.Format("2006-01-02")))
 		for _, line := range note.Notes {
 			_, err = file.WriteString(line + "\n")
 			if err != nil {
 				log.Fatal(err)
 			}
 		}
+		file.WriteString("\n")
 	}
 }
