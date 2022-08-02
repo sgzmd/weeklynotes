@@ -116,11 +116,29 @@ func main() {
 
 	// log.Printf("Notes found: %+v", notes)
 
+	// create file with the name set to current date
+	fileName := time.Now().Format("2006-01-02") + ".md"
+	file, err := os.Create(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	// write the header
+	header := fmt.Sprintf("# %s\n", time.Now().Format("2006-01-02"))
+	_, err = file.WriteString(header)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// write the notes
 	for _, note := range notes {
-		fmt.Printf("# %s on %s\n", note.Name, note.Date.Format("2006-01-02"))
+		file.WriteString(fmt.Sprintf("# %s on %s\n", note.Name, note.Date.Format("2006-01-02")))
 		for _, line := range note.Notes {
-			fmt.Printf("%s\n", line)
+			_, err = file.WriteString(line + "\n")
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
-		fmt.Printf("\n")
 	}
 }
