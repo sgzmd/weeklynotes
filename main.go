@@ -16,6 +16,7 @@ import (
 
 type Options struct {
 	Directory string `short:"d" long:"directory" description:"Directory to scan" default:"."`
+	OutputDir string `short:"o" long:"output-dir" description:"Output directory" default:"."`
 }
 
 type Note struct {
@@ -26,13 +27,6 @@ type Note struct {
 
 var options Options
 var parser = flags.NewParser(&options, flags.Default)
-
-// Checks the passed date is within the last 7 days from the current date
-func isDateWithinLast7Days(date time.Time) bool {
-	now := time.Now()
-	diff := now.Sub(date)
-	return diff.Hours() < 24.0*7
-}
 
 func ExtractNotesFromFile(path string) ([]Note, error) {
 	file, err := os.Open(path)
@@ -103,6 +97,9 @@ func main() {
 		if info.IsDir() {
 			return nil
 		}
+		if strings.Contains(path, "rollup.md") {
+			return nil
+		}
 		if filepath.Ext(path) == ".md" {
 			mds = append(mds, path)
 			note, err := ExtractNotesFromFile(path)
@@ -120,7 +117,8 @@ func main() {
 	})
 
 	// create file with the name set to current date
-	fileName := "notes.md"
+	now := time.Now()
+	fileName := fmt.Sprintf("%s/%s rollup.md", options.OutputDir, now.Format("2006-01-02"))
 	file, err := os.Create(fileName)
 	if err != nil {
 		log.Fatal(err)
