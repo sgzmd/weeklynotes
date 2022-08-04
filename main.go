@@ -148,7 +148,7 @@ func main() {
 		}
 		notes := groupedNotes[key]
 		if len(notes) > 0 {
-			fileName := fmt.Sprintf("%s/%s-notes.md", options.OutputDir, key.Format("2006-08-02"))
+			fileName := fmt.Sprintf("%s/%s-notes.md", options.OutputDir, key.Format("2006-01-02"))
 			log.Printf("Writing %s", fileName)
 			file, err := os.Create(fileName)
 			if err != nil {
