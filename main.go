@@ -12,11 +12,13 @@ import (
 
 	"github.com/araddon/dateparse"
 	"github.com/jessevdk/go-flags"
+	"github.com/sgzmd/weeklynotes/calutils"
 )
 
 type Options struct {
-	Directory string `short:"d" long:"directory" description:"Directory to scan" default:"."`
-	OutputDir string `short:"o" long:"output-dir" description:"Output directory" default:"."`
+	Directory     string `short:"d" long:"directory" description:"Directory to scan" default:"."`
+	OutputDir     string `short:"o" long:"output-dir" description:"Output directory" default:"."`
+	ScanBackWeeks int    `short:"w" long:"weeks-back" description:"Scan back this many weeks" default:"1"`
 }
 
 type Note struct {
@@ -75,6 +77,24 @@ func ExtractNotes(scanner *bufio.Scanner, name string) ([]Note, error) {
 	}
 }
 
+// Computes the date of monday as indicated by the week number and a year
+func CreateDateFromWeekNumberAndYear(week, year int) time.Time {
+	return time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, week*7)
+}
+
+// Groups all notes by the week, starting on Monday.
+func GroupNotesByCalendarWeek(notes []Note) map[time.Time][]Note {
+
+	groupedNotes := make(map[time.Time][]Note)
+	for _, note := range notes {
+		y, week := note.Date.ISOWeek()
+		monday := calutils.MondayOfTheWeek(y, week)
+		groupedNotes[monday] = append(groupedNotes[monday], note)
+	}
+
+	return groupedNotes
+}
+
 func main() {
 	if _, err := parser.Parse(); err != nil {
 		switch flagsErr := err.(type) {
@@ -97,7 +117,7 @@ func main() {
 		if info.IsDir() {
 			return nil
 		}
-		if strings.Contains(path, "rollup.md") {
+		if strings.Contains(path, "rollup") {
 			return nil
 		}
 		if filepath.Ext(path) == ".md" {
@@ -112,46 +132,37 @@ func main() {
 
 	// log.Printf("Notes found: %+v", notes)
 
-	sort.Slice(notes, func(i, j int) bool {
-		return notes[i].Date.After(notes[j].Date)
+	groupedNotes := GroupNotesByCalendarWeek(notes)
+	keys := make([]time.Time, 0)
+	for k := range groupedNotes {
+		keys = append(keys, k)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].After(keys[j])
 	})
 
-	// create file with the name set to current date
-	now := time.Now()
-	fileName := fmt.Sprintf("%s/%s rollup.md", options.OutputDir, now.Format("2006-01-02"))
-	file, err := os.Create(fileName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	// write the header
-	header := fmt.Sprintf("%% %s\n", time.Now().Format("2006-01-02"))
-	_, err = file.WriteString(header + "\n")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, week := notes[0].Date.ISOWeek()
-	_, _ = file.WriteString(fmt.Sprintf("# Week %d\n", week))
-	// write the notes
-	for _, note := range notes {
-		_, w := note.Date.ISOWeek()
-		if w != week {
-			week = w
-			_, err = file.WriteString(fmt.Sprintf("# Week %d\n", week))
+	for idx, key := range keys {
+		if idx > options.ScanBackWeeks {
+			break
+		}
+		notes := groupedNotes[key]
+		if len(notes) > 0 {
+			fileName := fmt.Sprintf("%s/%s-notes.md", options.OutputDir, key.Format("2006 Jan 02"))
+			log.Printf("Writing %s", fileName)
+			file, err := os.Create(fileName)
 			if err != nil {
 				log.Fatal(err)
 			}
-		}
+			defer file.Close()
 
-		file.WriteString(fmt.Sprintf("## %s on %s\n", note.Name, note.Date.Format("2006-01-02")))
-		for _, line := range note.Notes {
-			_, err = file.WriteString(line + "\n")
-			if err != nil {
-				log.Fatal(err)
+			file.WriteString(fmt.Sprintf("=== Note for the week of %s === \n", key.Format("Monday, January 2, 2006")))
+			for _, note := range notes {
+				file.WriteString(fmt.Sprintf("\n## %s on %s\n", note.Name, note.Date.Format("2006 Jan 2")))
+				for _, line := range note.Notes {
+					file.WriteString(fmt.Sprintf("%s\n", line))
+				}
 			}
 		}
-		file.WriteString("\n")
 	}
 }
